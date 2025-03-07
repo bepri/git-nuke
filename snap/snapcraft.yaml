@@ -1,5 +1,5 @@
 name: git-nuke
-base: core18
+base: core24
 version: '0.1'
 summary: The best thing since sliced bread
 description: |
@@ -15,4 +15,4 @@ parts:
 
 apps:
   git-nuke:
-    command: /snap/core18/current/usr/bin/python3 $SNAP/git-nuke
+    command: /snap/core24/current/usr/bin/python3 $SNAP/git-nuke
