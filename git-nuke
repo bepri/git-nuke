@@ -63,7 +63,9 @@ def delete_branch(branch: str) -> None:
 def handle_not_in_git_repo() -> int:
     try:
         if (
-            subcall([GIT_EXECUTABLE, "rev-parse", "--is-inside-work-tree"]).stdout
+            subcall(
+                [GIT_EXECUTABLE, "rev-parse", "--is-inside-work-tree"]
+            ).stdout.strip()
             == b"true"
         ):
             return 0
@@ -76,19 +78,24 @@ def handle_not_in_git_repo() -> int:
 
     files = list(pathlib.Path.cwd().glob("**/*"))
 
-    unnecessary_file = files[random.randint(0, len(files))]
+    print("Not in a git repository. ", end="")
+    while True:
+        unnecessary_file = files[random.randint(0, len(files))]
 
-    while response := input(
-        f"Not in a git repository. Would you like to delete {unnecessary_file.relative_to(pathlib.Path.cwd())} instead? (Y/n) "
-    ).lower():
-        if response in ["y", "n", ""]:
-            break
+        while response := input(
+            f"Would you like to delete {unnecessary_file.relative_to(pathlib.Path.cwd())} instead? (Y/n) "
+        ).lower():
+            if response in ["y", "n", ""]:
+                break
 
-    if response != "n":
-        unnecessary_file.unlink()
-        return 0
+        if response != "n":
+            try:
+                unnecessary_file.unlink()
+                return 1
+            except (PermissionError, OSError):
+                print("Nevermind, that file seems useful. ", end="")
 
-    return 1
+    return 2
 
 
 def main() -> int:
