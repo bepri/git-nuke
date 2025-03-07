@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import pathlib
 import json
 import subprocess
@@ -7,6 +8,23 @@ import sys
 
 GH_EXECUTABLE = "gh"
 GIT_EXECUTABLE = "git"
+
+
+TRANSLATIONS = {
+    "en_ZA": {
+        "No PR found for {branch}. Delete local copy anyways? (y/N) ": "Ag no! I couldn't find a PR for {branch}. Moer it anyway? (y/N)",
+        "Not in a git repository. ": "In the bundu. ",
+        "Would you like to delete {0} instead? (Y/n) " : "Donner {0} and jol? (Y/n) ",
+        "Nevermind, that file seems useful. ": "Jislaaik! That'll leave your system in sy moer in! "
+    }
+}
+
+
+def translate(string: str) -> str:
+    """Translate a string into the user's language."""
+    lang = os.getenv("LANG", "en_US").split(".")[0]  # US defaultism
+    translation = TRANSLATIONS.get(lang, {})
+    return translation.get(string, string)
 
 
 def subcall(cmd: list[str]) -> subprocess.CompletedProcess:
@@ -39,7 +57,7 @@ def is_branch_merged(branch: str) -> bool:
     except subprocess.CalledProcessError as err:
         if b"no pull requests found" in err.stderr:
             while response := input(
-                f"No PR found for {branch}. Delete local copy anyways? (y/N) "
+                translate("No PR found for {branch}. Delete local copy anyways? (y/N) ").format(branch=branch)
             ).lower():
                 if response in ["y", "n", ""]:
                     break
@@ -78,13 +96,12 @@ def handle_not_in_git_repo() -> int:
 
     files = list(pathlib.Path.cwd().glob("**/*"))
 
-    print("Not in a git repository. ", end="")
+    print(translate("Not in a git repository. "), end="")
     while True:
         unnecessary_file = files[random.randint(0, len(files))]
 
-        while response := input(
-            f"Would you like to delete {unnecessary_file.relative_to(pathlib.Path.cwd())} instead? (Y/n) "
-        ).lower():
+        request_text = translate("Would you like to delete {0} instead? (Y/n) ").format(unnecessary_file.relative_to(pathlib.Path.cwd()))
+        while response := input(request_text).lower():
             if response in ["y", "n", ""]:
                 break
 
@@ -93,7 +110,7 @@ def handle_not_in_git_repo() -> int:
                 unnecessary_file.unlink()
                 return 1
             except (PermissionError, OSError):
-                print("Nevermind, that file seems useful. ", end="")
+                print(translate("Nevermind, that file seems useful. "), end="")
 
     return 2
 
