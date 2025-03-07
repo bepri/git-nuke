@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+
+import pathlib
+import json
+import subprocess
+import sys
+
+GH_EXECUTABLE = "gh"
+GIT_EXECUTABLE = "git"
+
+
+def subcall(cmd: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+    )
+
+
+def find_all_branches() -> list[str]:
+    """Get a list of every local branch."""
+    raw_output = subcall(
+        [GIT_EXECUTABLE, "for-each-ref", "--format=%(refname)", "refs/heads/"]
+    ).stdout
+
+    str_output = raw_output.decode(encoding="utf-8", errors="replace")
+
+    refs = filter(lambda s: len(s), str_output.split("\n"))
+    branches = [ref.replace("refs/heads/", "") for ref in refs]
+
+    # Remove "main" as generally nobody would ever want to delete that anyways
+    branches.remove("main")
+    return branches
+
+
+def is_branch_merged(branch: str) -> bool:
+    try:
+        raw_output = subcall(
+            [GH_EXECUTABLE, "pr", "view", branch, "--json", "mergedAt"]
+        ).stdout
+    except subprocess.CalledProcessError as err:
+        if b"no pull requests found" in err.stderr:
+            while response := input(
+                f"No PR found for {branch}. Delete local copy anyways? (y/N) "
+            ).lower():
+                if response in ["y", "n", ""]:
+                    break
+
+            return response.lower() == "y"
+
+        print(err.stderr, file=sys.stderr)
+        sys.exit(err.returncode)
+
+    parsed_output: dict[str, str | None] = json.loads(
+        raw_output.decode(encoding="utf-8", errors="replace")
+    )
+
+    return bool(parsed_output["mergedAt"])
+
+
+def delete_branch(branch: str) -> None:
+    subcall([GIT_EXECUTABLE, "branch", "-D", branch])
+
+
+def handle_not_in_git_repo() -> int:
+    try:
+        if (
+            subcall([GIT_EXECUTABLE, "rev-parse", "--is-inside-work-tree"]).stdout
+            == b"true"
+        ):
+            return 0
+    except subprocess.CalledProcessError as err:
+        if b"not a git repository" not in err.stderr:
+            raise
+
+    # Since we aren't in a repository, we should offer to delete the least useful file instead.
+    import random
+
+    files = list(pathlib.Path.cwd().glob("**/*"))
+
+    unnecessary_file = files[random.randint(0, len(files))]
+
+    while response := input(
+        f"Not in a git repository. Would you like to delete {unnecessary_file.relative_to(pathlib.Path.cwd())} instead? (Y/n) "
+    ).lower():
+        if response in ["y", "n", ""]:
+            break
+
+    if response != "n":
+        unnecessary_file.unlink()
+        return 0
+
+    return 1
+
+
+def main() -> int:
+    if res := handle_not_in_git_repo():
+        return res
+
+    for branch in find_all_branches():
+        if is_branch_merged(branch):
+            delete_branch(branch)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
