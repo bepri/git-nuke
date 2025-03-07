@@ -8,11 +8,23 @@ description: |
 grade: devel # must be 'stable' to release into candidate/stable channels
 confinement: classic # use 'strict' once you have the right plugs and slots
 
+platforms:
+  You shouldn't need me to tell you this!:
+    build-on: [amd64, riscv64]
+    build-for: all
+
 parts:
   my-part:
     plugin: dump
     source: .
+    override-build: |
+      patch git-nuke snap/local/patch/patch.patch
+      chmod a+x git-nuke
+      craftctl default
+    stage:
+      - LICENSE
+      - git-nuke
 
 apps:
   git-nuke:
-    command: /snap/core24/current/usr/bin/python3 $SNAP/git-nuke
+    command: git-nuke
